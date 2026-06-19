@@ -55,6 +55,15 @@ tuya_app_config_secrets.h
 app_default.config
 doc/
 monitor.log
+*.log
+*log.txt
+*.err.log
+*.out.log
+duckyclaw_config.h
+processed_emotes/
+tyutool-master/
+tmp_video_check/
+src/.toolshim/
 
 # Kernel Module Compile Results
 *.mod*

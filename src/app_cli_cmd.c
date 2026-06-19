@@ -10,6 +10,7 @@
 #include "channels/discord_bot.h"
 #include "channels/feishu_bot.h"
 #include "channels/telegram_bot.h"
+#include "config.h"
 #include "im_config.h"
 #include "im_platform.h"
 #include "proxy/http_proxy.h"
@@ -61,6 +62,10 @@ static void cmd_cfg_set_fs_appsecret(int argc, char *argv[]);
 static void cmd_cfg_set_fs_allow(int argc, char *argv[]);
 static void cmd_cfg_set_proxy(int argc, char *argv[]);
 static void cmd_cfg_clear_proxy(int argc, char *argv[]);
+static void cmd_status(int argc, char *argv[]);
+static void cmd_risk_test(int argc, char *argv[]);
+static void cmd_alarm(int argc, char *argv[]);
+static void cmd_ble_rescan(int argc, char *argv[]);
 static void cli_clear_weixin_cfg_overrides_(void);
 
 /* ---------------------------------------------------------------------------
@@ -123,6 +128,27 @@ static void cli_mask_copy_(const char *src, char *out, size_t out_size)
 static const char *cli_bool_to_str_(bool value)
 {
     return value ? "true" : "false";
+}
+
+/**
+ * @brief Convert terminal state enum to CLI text.
+ * @param[in] state Terminal system state.
+ * @return State text.
+ */
+static const char *cli_terminal_state_to_str_(TERMINAL_SYSTEM_STATE_E state)
+{
+    switch (state) {
+    case TERMINAL_STATE_NORMAL:
+        return "normal";
+    case TERMINAL_STATE_WARNING:
+        return "warning";
+    case TERMINAL_STATE_PRE_ALERT:
+        return "pre_alert";
+    case TERMINAL_STATE_EMERGENCY:
+        return "emergency";
+    default:
+        return "unknown";
+    }
 }
 
 /**
@@ -416,6 +442,12 @@ static void cmd_help(int argc, char *argv[])
     cli_echof_("  %-28s %s", "cfg_set_fs_allow <csv>", "Set Feishu allow_from CSV");
     cli_echof_("  %-28s %s", "cfg_set_proxy <host> <port> [type]", "Set outbound proxy");
     cli_echof_("  %-28s %s", "cfg_clear_proxy", "Clear outbound proxy config");
+    tal_cli_echo("");
+    tal_cli_echo("[Diagnostics]");
+    cli_echof_("  %-28s %s", "status", "Show app, cloud and BLE state");
+    cli_echof_("  %-28s %s", "risk_test <0..100> [event]", "Inject test risk score");
+    cli_echof_("  %-28s %s", "alarm <on|off>", "Trigger or release manual alarm");
+    cli_echof_("  %-28s %s", "ble_rescan", "Restart BLE GATT scan/connect");
     tal_cli_echo("");
     tal_cli_echo("Note: cfg_* changes take effect after reconnect or reboot.");
 }
@@ -760,6 +792,119 @@ static void cmd_cfg_clear_proxy(int argc, char *argv[])
     tal_cli_echo("OK: proxy cleared");
 }
 
+/**
+ * @brief Show runtime status for field diagnostics.
+ * @param[in] argc CLI argc
+ * @param[in] argv CLI argv
+ * @return none
+ */
+static void cmd_status(int argc, char *argv[])
+{
+    TERMINAL_APP_STATE_T state;
+    TERMINAL_BLE_STATUS_T ble_status;
+
+    (void)argc;
+    (void)argv;
+
+    memset(&state, 0, sizeof(state));
+    memset(&ble_status, 0, sizeof(ble_status));
+
+    terminal_app_get_state(&state);
+    (void)terminal_ble_get_status(&ble_status);
+
+    tal_cli_echo("--- Runtime status ---");
+    cli_echof_("  %-18s %s", "system_state", cli_terminal_state_to_str_(state.system_state));
+    cli_echof_("  %-18s %u", "risk_score", (unsigned)state.risk_score);
+    cli_echof_("  %-18s %s", "manual_alarm", cli_bool_to_str_(state.manual_alarm ? true : false));
+    cli_echof_("  %-18s %s", "cloud_online", cli_bool_to_str_(state.cloud_online ? true : false));
+    cli_echof_("  %-18s %s", "ble_online", cli_bool_to_str_(state.ble_online ? true : false));
+    cli_echof_("  %-18s %u", "eeg_state", (unsigned)state.eeg_state);
+    cli_echof_("  %-18s %d,%d,%d", "gyro", (int)state.gyro_x, (int)state.gyro_y, (int)state.gyro_z);
+    cli_echof_("  %-18s %s", "event_id", state.event_id);
+    tal_cli_echo("[BLE GATT]");
+    cli_echof_("  %-18s %s", "ready", cli_bool_to_str_(ble_status.ready ? true : false));
+    cli_echof_("  %-18s %s", "scanning", cli_bool_to_str_(ble_status.scanning ? true : false));
+    cli_echof_("  %-18s %s", "connecting", cli_bool_to_str_(ble_status.connecting ? true : false));
+    cli_echof_("  %-18s %s", "connected", cli_bool_to_str_(ble_status.connected ? true : false));
+    cli_echof_("  %-18s %u", "retry_count", (unsigned)ble_status.retry_count);
+    cli_echof_("  %-18s 0x%04x", "conn_handle", (unsigned)ble_status.conn_handle);
+    cli_echof_("  %-18s 0x%04x", "notify_handle", (unsigned)ble_status.notify_handle);
+    cli_echof_("  %-18s 0x%04x", "read_handle", (unsigned)ble_status.read_handle);
+}
+
+/**
+ * @brief Inject a test risk score.
+ * @param[in] argc CLI argc
+ * @param[in] argv CLI argv
+ * @return none
+ */
+static void cmd_risk_test(int argc, char *argv[])
+{
+    long risk;
+    const char *event_id = NULL;
+
+    if (argc < 2) {
+        tal_cli_echo("Usage: risk_test <0..100> [event_id]");
+        return;
+    }
+
+    risk = strtol(argv[1], NULL, 10);
+    if (risk < 0 || risk > 100) {
+        tal_cli_echo("ERR: risk must be 0..100");
+        return;
+    }
+
+    if (argc >= 3) {
+        event_id = argv[2];
+    }
+
+    terminal_app_debug_set_risk((uint8_t)risk, event_id);
+    cli_echof_("OK: injected risk=%ld", risk);
+}
+
+/**
+ * @brief Trigger or release manual alarm.
+ * @param[in] argc CLI argc
+ * @param[in] argv CLI argv
+ * @return none
+ */
+static void cmd_alarm(int argc, char *argv[])
+{
+    if (argc < 2) {
+        tal_cli_echo("Usage: alarm <on|off>");
+        return;
+    }
+
+    if (strcmp(argv[1], "on") == 0) {
+        terminal_app_request_manual_alarm(TRUE);
+        tal_cli_echo("OK: manual alarm on");
+        return;
+    }
+
+    if (strcmp(argv[1], "off") == 0) {
+        terminal_app_request_manual_alarm(FALSE);
+        tal_cli_echo("OK: manual alarm off");
+        return;
+    }
+
+    tal_cli_echo("ERR: alarm value must be on or off");
+}
+
+/**
+ * @brief Restart BLE scan/connect flow.
+ * @param[in] argc CLI argc
+ * @param[in] argv CLI argv
+ * @return none
+ */
+static void cmd_ble_rescan(int argc, char *argv[])
+{
+    (void)argc;
+    (void)argv;
+
+    terminal_ble_restart_scan();
+    tal_cli_echo("OK: BLE rescan requested");
+}
+
 /* ---------------------------------------------------------------------------
  * Command table
  * --------------------------------------------------------------------------- */
@@ -783,6 +928,10 @@ static cli_cmd_t s_cli_cmd[] = {
     {.name = "cfg_set_fs_allow",      .help = "Set Feishu allow_from CSV",              .func = cmd_cfg_set_fs_allow},
     {.name = "cfg_set_proxy",         .help = "Set outbound proxy",                     .func = cmd_cfg_set_proxy},
     {.name = "cfg_clear_proxy",       .help = "Clear outbound proxy",                   .func = cmd_cfg_clear_proxy},
+    {.name = "status",                .help = "Show runtime status",                    .func = cmd_status},
+    {.name = "risk_test",             .help = "Inject test risk score",                 .func = cmd_risk_test},
+    {.name = "alarm",                 .help = "Trigger or release manual alarm",        .func = cmd_alarm},
+    {.name = "ble_rescan",            .help = "Restart BLE GATT scan/connect",          .func = cmd_ble_rescan},
 };
 
 /* ---------------------------------------------------------------------------
