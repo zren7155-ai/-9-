@@ -1,0 +1,13 @@
+dependencies:
+  esp_sccb_intf:
+    path: D:/ESP32_P4nano/esp-video-components-temp/esp_sccb_intf
+  esp_cam_sensor:
+    path: D:/ESP32_P4nano/esp-video-components-temp/esp_cam_sensor
+  esp_ipa:
+    path: D:/ESP32_P4nano/esp-video-components-temp/esp_ipa
+  esp_video:
+    path: D:/ESP32_P4nano/esp-video-components-temp/esp_video
+  espressif/esp_wifi_remote:
+    rules:
+      - if: target in [esp32p4]
+    version: ~0.5.1

@@ -1,0 +1,46 @@
+idf_component_register(
+    SRCS
+        "main.c"
+        "sensor.c"
+        "eeg.c"
+        "camera_ring.c"
+        "risk_engine.c"
+        "ble.c"
+        "pc_eeg_bridge.c"
+        "audio_alert.c"
+        "voice_assets.c"
+        "wifi_upload.c"
+        "event_router.c"
+        "event_capture.c"
+        "event_queue.c"
+        "state_machine.c"
+        "serial_telemetry.c"
+        "mjpeg_stream.c"
+        "temporal_learning.c"
+        "learning_loop_engine.c"
+        "adaptive_learning.c"
+        "eeg_trend.c"
+        "pose_trend.c"
+        "ai_feedback_parser.c"
+        "learning_storage.c"
+    INCLUDE_DIRS "."
+    REQUIRES
+        driver
+        esp_driver_i2c
+        esp_driver_i2s
+        esp_driver_jpeg
+        esp_event
+        esp_http_client
+        esp_http_server
+        esp_netif
+        esp_timer
+        esp_wifi
+        bt
+        esp_video
+        esp_cam_sensor
+        esp_driver_cam
+        fatfs
+        json
+        mbedtls
+        nvs_flash
+)

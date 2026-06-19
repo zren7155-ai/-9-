@@ -1,0 +1,46 @@
+# ESP-IDF build output
+build/
+build_*/
+*/build/
+*/build_*/
+sdkconfig.old
+
+# Local credentials and deployment keys
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.env
+bodyguard_esp32_p4/main/bodyguard_private_config.h
+aliyun_new_pub.txt
+deploy_app_b64.txt
+
+# Runtime data, logs, captures, and generated media
+*.log
+*.bin
+*.jpg
+*.jpeg
+*.png
+cloud_server/data/
+cloud_server/logs/
+
+# Python local state and vendored scratch dependencies
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pydeps/
+pydeps/
+pc_monitor_deps/
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Large vendor/demo archives and local extracted reference dumps
+*.zip
+waveshare_demo/
+esp_video_backup/
